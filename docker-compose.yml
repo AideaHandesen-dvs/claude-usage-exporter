@@ -1,0 +1,15 @@
+services:
+  claude-usage-exporter:
+    build: .
+    # or: image: ghcr.io/<you>/claude-usage-exporter:latest
+    container_name: claude-usage-exporter
+    restart: unless-stopped
+    ports:
+      - "9183:9183"
+    environment:
+      # Optional: set a per-block token budget to get a "% used" gauge.
+      # BLOCK_TOKEN_LIMIT: "0"
+      SCRAPE_INTERVAL_SEC: "15"
+    volumes:
+      # Claude Code transcripts, mounted read-only.
+      - ${HOME}/.claude/projects:/projects:ro

@@ -1,0 +1,11 @@
+# Minimal Prometheus scrape config for claude-usage-exporter.
+# Merge the scrape_configs entry into your existing prometheus.yml.
+global:
+  scrape_interval: 30s
+
+scrape_configs:
+  - job_name: claude-usage
+    static_configs:
+      - targets: ["localhost:9183"]
+        labels:
+          instance: claude-code

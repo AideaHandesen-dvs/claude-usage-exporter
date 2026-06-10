@@ -1,0 +1,18 @@
+# systemd user unit. Install to ~/.config/systemd/user/ then:
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now claude-usage-exporter
+#
+# Adjust ExecStart path to wherever you cloned the repo.
+[Unit]
+Description=Claude Code usage Prometheus exporter
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 %h/claude-usage-exporter/claude_usage_exporter.py
+Restart=on-failure
+RestartSec=5
+Environment=EXPORTER_PORT=9183
+# Environment=BLOCK_TOKEN_LIMIT=0
+
+[Install]
+WantedBy=default.target
