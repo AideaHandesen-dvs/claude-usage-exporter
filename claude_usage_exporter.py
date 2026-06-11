@@ -349,9 +349,9 @@ def render() -> str:
     b_cost = 0.0
     b_msgs = 0
     b_active = 0
-    b_start = 0.0
-    b_end = 0.0
-    until = 0.0
+    b_start = None
+    b_end = None
+    until = None
     if block:
         b_active = 1
         b_start = block["start"]
@@ -383,17 +383,23 @@ def render() -> str:
     out.append("# TYPE claude_block_active gauge")
     line("claude_block_active", b_active)
 
+    # When no 5h block is active (idle), these are undefined — emit nothing so
+    # Grafana shows "No data" instead of a literal 0 that looks like an
+    # imminent reset. block_active above distinguishes the two states.
     out.append("# HELP claude_block_start_timestamp_seconds Active block start (unix).")
     out.append("# TYPE claude_block_start_timestamp_seconds gauge")
-    line("claude_block_start_timestamp_seconds", f"{b_start:.0f}")
+    if b_start is not None:
+        line("claude_block_start_timestamp_seconds", f"{b_start:.0f}")
 
     out.append("# HELP claude_block_end_timestamp_seconds Limit reset time (unix).")
     out.append("# TYPE claude_block_end_timestamp_seconds gauge")
-    line("claude_block_end_timestamp_seconds", f"{b_end:.0f}")
+    if b_end is not None:
+        line("claude_block_end_timestamp_seconds", f"{b_end:.0f}")
 
     out.append("# HELP claude_block_seconds_until_reset Seconds until the limit resets.")
     out.append("# TYPE claude_block_seconds_until_reset gauge")
-    line("claude_block_seconds_until_reset", f"{until:.0f}")
+    if until is not None:
+        line("claude_block_seconds_until_reset", f"{until:.0f}")
 
     out.append("# HELP claude_block_token_limit Configured token budget per block (0=unset).")
     out.append("# TYPE claude_block_token_limit gauge")
