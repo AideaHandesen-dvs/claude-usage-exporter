@@ -59,6 +59,8 @@ PORT = int(os.environ.get("EXPORTER_PORT", "9183"))
 ADDR = os.environ.get("EXPORTER_ADDR", "0.0.0.0")
 SCRAPE_INTERVAL = float(os.environ.get("SCRAPE_INTERVAL_SEC", "15"))
 BLOCK_TOKEN_LIMIT = int(os.environ.get("BLOCK_TOKEN_LIMIT", "0"))
+# Local-time offset in hours for "today"/"this month" boundaries (e.g. 9 = JST).
+USAGE_TZ_OFFSET = float(os.environ.get("USAGE_TZ_OFFSET", "0")) * 3600
 
 # 5-hour rolling window used by Claude subscription rate limits.
 BLOCK_SECONDS = 5 * 3600
@@ -208,6 +210,20 @@ def _floor_hour(ts: float) -> float:
     return dt.replace(minute=0, second=0, microsecond=0).timestamp()
 
 
+def _day_start(now: float) -> float:
+    """Epoch of local midnight today (local = UTC + USAGE_TZ_OFFSET)."""
+    lt = datetime.fromtimestamp(now + USAGE_TZ_OFFSET, tz=timezone.utc)
+    d = lt.replace(hour=0, minute=0, second=0, microsecond=0)
+    return d.timestamp() - USAGE_TZ_OFFSET
+
+
+def _month_start(now: float) -> float:
+    """Epoch of local midnight on the 1st of the current month."""
+    lt = datetime.fromtimestamp(now + USAGE_TZ_OFFSET, tz=timezone.utc)
+    d = lt.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    return d.timestamp() - USAGE_TZ_OFFSET
+
+
 def _active_block(entries: list[Entry], now: float):
     """Reconstruct 5h blocks and return the one active at `now` (or None).
 
@@ -290,6 +306,41 @@ def render() -> str:
     out.append("# TYPE claude_usage_messages_total counter")
     for model, c in sorted(msgs.items()):
         line("claude_usage_messages_total", c, model=model)
+
+    # windowed totals: today / this month (local calendar via USAGE_TZ_OFFSET)
+    day0 = _day_start(now)
+    mon0 = _month_start(now)
+    win = {"today": {"cost": 0.0, "tokens": 0, "messages": 0},
+           "month": {"cost": 0.0, "tokens": 0, "messages": 0}}
+    for e in entries:
+        if e.ts >= mon0:
+            tt = e.input + e.output + e.cache_read + e.cw5m + e.cw1h
+            win["month"]["cost"] += e.cost
+            win["month"]["tokens"] += tt
+            win["month"]["messages"] += 1
+            if e.ts >= day0:
+                win["today"]["cost"] += e.cost
+                win["today"]["tokens"] += tt
+                win["today"]["messages"] += 1
+
+    out.append("# HELP claude_usage_cost_usd_today API-equivalent cost since local midnight.")
+    out.append("# TYPE claude_usage_cost_usd_today gauge")
+    line("claude_usage_cost_usd_today", f"{win['today']['cost']:.6f}")
+    out.append("# HELP claude_usage_cost_usd_month API-equivalent cost this calendar month.")
+    out.append("# TYPE claude_usage_cost_usd_month gauge")
+    line("claude_usage_cost_usd_month", f"{win['month']['cost']:.6f}")
+    out.append("# HELP claude_usage_tokens_today Total tokens since local midnight.")
+    out.append("# TYPE claude_usage_tokens_today gauge")
+    line("claude_usage_tokens_today", win["today"]["tokens"])
+    out.append("# HELP claude_usage_tokens_month Total tokens this calendar month.")
+    out.append("# TYPE claude_usage_tokens_month gauge")
+    line("claude_usage_tokens_month", win["month"]["tokens"])
+    out.append("# HELP claude_usage_messages_today Assistant messages since local midnight.")
+    out.append("# TYPE claude_usage_messages_today gauge")
+    line("claude_usage_messages_today", win["today"]["messages"])
+    out.append("# HELP claude_usage_messages_month Assistant messages this calendar month.")
+    out.append("# TYPE claude_usage_messages_month gauge")
+    line("claude_usage_messages_month", win["month"]["messages"])
 
     # active 5h block
     block = _active_block(entries, now)

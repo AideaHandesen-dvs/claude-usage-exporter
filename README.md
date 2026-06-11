@@ -82,6 +82,7 @@ All via environment variables:
 | `EXPORTER_ADDR` | `0.0.0.0` | Bind address |
 | `SCRAPE_INTERVAL_SEC` | `15` | Minimum seconds between full rescans (a scrape inside this window reuses cached state) |
 | `BLOCK_TOKEN_LIMIT` | `0` | Optional token budget per 5h block. Set it to draw a "% of block used" gauge in Grafana. `0` disables. |
+| `USAGE_TZ_OFFSET` | `0` | Local-time offset in hours used to cut the **today / this-month** boundaries (e.g. `9` for JST). |
 
 ---
 
@@ -92,6 +93,9 @@ All via environment variables:
 | `claude_usage_tokens_total` | counter | `model`, `type` | Cumulative tokens. `type` ∈ input, output, cache_read, cache_write_5m, cache_write_1h |
 | `claude_usage_cost_usd_total` | counter | `model` | Cumulative API-equivalent cost (USD) |
 | `claude_usage_messages_total` | counter | `model` | Cumulative assistant messages |
+| `claude_usage_cost_usd_today` / `_month` | gauge | | API-equivalent cost since local midnight / this calendar month |
+| `claude_usage_tokens_today` / `_month` | gauge | | Total tokens since local midnight / this calendar month |
+| `claude_usage_messages_today` / `_month` | gauge | | Assistant messages since local midnight / this calendar month |
 | `claude_block_tokens` | gauge | `type` | Tokens used in the active 5h block |
 | `claude_block_cost_usd` | gauge | | API-equivalent cost in the active block |
 | `claude_block_messages` | gauge | | Messages in the active block |
